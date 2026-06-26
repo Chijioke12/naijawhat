@@ -1,0 +1,6 @@
+{
+  "name": "Naija Whot HD",
+  "description": "A classic Naija Whot card game rebuilt with Phaser 3 and Preact.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
