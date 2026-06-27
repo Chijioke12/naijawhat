@@ -58,6 +58,7 @@ body, html {
 .menu-list.scrollable {
   justify-content: flex-start;
   padding: 10px;
+  overflow-y: auto;
 }
 
 .menu-item {
@@ -125,15 +126,16 @@ body, html {
 .setting-item {
   display: flex;
   justify-content: space-between;
-  padding: 8px 10px;
-  background: #333;
-  margin-bottom: 5px;
-  border-radius: 4px;
-  font-size: 12px;
+  align-items: center;
+  padding: 12px 10px;
+  background: transparent;
+  border-bottom: 1px solid #333;
+  font-size: 14px;
 }
 
 .setting-item.active {
-  background: #3498db;
+  background: rgba(52, 152, 219, 0.3);
+  border-left: 4px solid #3498db;
   color: #fff;
 }
 

@@ -81,7 +81,6 @@ export interface AppState {
   msgColor: string;
   settings: {
     sfx: boolean;
-    aiBanter: boolean;
     whotCard: boolean;
     pick3: boolean;
     suspend: boolean;
@@ -144,7 +143,7 @@ class WhotScene extends Phaser.Scene {
   
   // Game State
   screen: string = 'MENU';
-  settings = { sfx: true, aiBanter: true, whotCard: true, pick3: true, suspend: true, emptyMarketEnds: false };
+  settings = { sfx: true, whotCard: true, pick3: true, suspend: true, emptyMarketEnds: false };
   menuIndex = 0;
   settingIndex = 0;
   skLeft = '';
@@ -172,6 +171,7 @@ class WhotScene extends Phaser.Scene {
   deckText!: Phaser.GameObjects.Text;
   cpuText!: Phaser.GameObjects.Text;
   neededText!: Phaser.GameObjects.Text;
+  neededShape!: Phaser.GameObjects.Graphics;
   whotOverlay!: Phaser.GameObjects.Container;
   whotShapes: Phaser.GameObjects.Graphics[] = [];
 
@@ -195,7 +195,9 @@ class WhotScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#1a5f35');
     this.deckText = this.add.text(43, 183, '', { font: 'bold 12px Arial', color: '#fdfaf0' }).setOrigin(0.5, 0);
     this.cpuText = this.add.text(120, 85, '', { font: 'bold 12px Arial', color: '#fff' }).setOrigin(0.5, 0);
-    this.neededText = this.add.text(190, 135, '', { font: 'bold 10px Arial', color: '#fff', align: 'center' }).setOrigin(0.5, 1);
+    this.neededText = this.add.text(190, 135, '', { font: 'bold 12px Arial', color: '#fff', align: 'center' }).setOrigin(0.5, 1);
+    this.neededShape = this.add.graphics();
+    this.neededShape.setDepth(20);
     
     this.whotOverlay = this.add.container(0, 0);
     this.whotOverlay.setDepth(200);
@@ -685,9 +687,11 @@ class WhotScene extends Phaser.Scene {
     const neededKey = `${this.neededSuit}_${this.screen}`;
     if (this.neededText.getData('neededKey') !== neededKey) {
       this.neededText.setData('neededKey', neededKey);
+      this.neededShape.clear();
       if (this.neededSuit && this.screen !== 'WHOT_CHOICE') {
-        this.neededText.setText(`NEEDED:\n${this.neededSuit.toUpperCase()}`);
-        this.neededText.setColor(this.getColorHex(this.neededSuit));
+        this.neededText.setText(`I NEED:`);
+        this.neededText.setColor('#fff');
+        this.drawShape(this.neededShape, this.neededSuit, 190, 150, 12, COLORS[this.neededSuit]);
       } else {
         this.neededText.setText('');
       }

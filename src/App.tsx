@@ -8,7 +8,7 @@ export default function App() {
     screen: 'MENU',
     msg: '',
     msgColor: '#fff',
-    settings: { sfx: true, aiBanter: true, whotCard: true, pick3: true, suspend: true, emptyMarketEnds: false },
+    settings: { sfx: true, whotCard: true, pick3: true, suspend: true, emptyMarketEnds: false },
     menuIndex: 0,
     settingIndex: 0,
     cpuScore: 0,
@@ -25,9 +25,16 @@ export default function App() {
 
   useEffect(() => {
     if (screen === 'SETTINGS' && settingsListRef.current) {
-      const activeItem = settingsListRef.current.querySelector('.setting-item.active');
+      const activeItem = settingsListRef.current.querySelector('.setting-item.active') as HTMLElement;
       if (activeItem) {
-        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const container = settingsListRef.current;
+        const elementTop = activeItem.offsetTop;
+        const elementHeight = activeItem.offsetHeight;
+        const containerHeight = container.clientHeight;
+
+        // Manual scroll calculation for center alignment
+        const targetScrollPos = elementTop - (containerHeight / 2) + (elementHeight / 2);
+        container.scrollTop = targetScrollPos;
       }
     }
   }, [settingIndex, screen]);
@@ -96,10 +103,9 @@ export default function App() {
 
         <div className={`screen-overlay ${screen === 'SETTINGS' ? '' : 'hidden'}`}>
           <div className="title">SETTINGS</div>
-          <div className="menu-list scrollable" ref={settingsListRef} style={{ maxHeight: '180px', overflowY: 'auto' }}>
+          <div className="menu-list scrollable" ref={settingsListRef}>
             {[
               { key: 'sfx', label: 'Sound FX' },
-              { key: 'aiBanter', label: 'AI Banter' },
               { key: 'whotCard', label: 'Whot Card (20)' },
               { key: 'pick3', label: 'Pick Three (5)' },
               { key: 'suspend', label: 'Suspend (8)' },
