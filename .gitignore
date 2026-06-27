@@ -8,3 +8,4 @@ coverage/
 !.env.example
 *.zip
 omnisd_build/
+public/*.ogg

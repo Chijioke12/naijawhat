@@ -13,9 +13,14 @@ const COLORS: Record<string, number> = {
 
 const r = new ((window as any).AudioContext || (window as any).webkitAudioContext)();
 
-function playSound(e: string, settings: any) {
+function playSound(e: string, settings: any, scene?: any) {
   if (!settings.sfx) return;
-  d(e);
+  
+  if (scene && scene.sound && scene.sound.get(e)) {
+    scene.sound.play(e);
+  } else {
+    d(e);
+  }
 }
 
 function d(e: string) {
@@ -189,15 +194,19 @@ class WhotScene extends Phaser.Scene {
 
     // Use explicit relative paths for better reliability on KaiOS/OmniSD
     this.load.atlas('whot', './whot_spritesheet.png', './whot_atlas.json');
+
+    const sounds = ['deal', 'market', 'play', 'hold', 'suspend', 'error', 'lose', 'pick2', 'pick3', 'win', 'whot', 'tick'];
+    sounds.forEach(s => this.load.audio(s, `./${s}.ogg`));
   }
 
   create() {
     this.cameras.main.setBackgroundColor('#1a5f35');
     this.deckText = this.add.text(43, 183, '', { font: 'bold 12px Arial', color: '#fdfaf0' }).setOrigin(0.5, 0);
     this.cpuText = this.add.text(120, 85, '', { font: 'bold 12px Arial', color: '#fff' }).setOrigin(0.5, 0);
-    this.neededText = this.add.text(190, 135, '', { font: 'bold 12px Arial', color: '#fff', align: 'center' }).setOrigin(0.5, 1);
+    this.neededText = this.add.text(10, 10, '', { font: 'bold 12px Arial', color: '#fff' }).setOrigin(0, 0);
+    this.neededText.setDepth(1000);
     this.neededShape = this.add.graphics();
-    this.neededShape.setDepth(20);
+    this.neededShape.setDepth(1000);
     
     this.whotOverlay = this.add.container(0, 0);
     this.whotOverlay.setDepth(200);
@@ -208,7 +217,6 @@ class WhotScene extends Phaser.Scene {
     bg.fillRect(0, 0, 240, 295);
     this.whotOverlay.add(bg);
     
-    this.whotOverlay.add(this.add.text(120, 80, 'I NEED...', { font: 'bold 16px Arial', color: '#f1c40f' }).setOrigin(0.5));
     
     const cx = 120, cy = 120, r = 50;
     SUITS.forEach((suit, i) => {
@@ -320,7 +328,7 @@ class WhotScene extends Phaser.Scene {
     
     this.selectedIndex = 0;
     this.isPlayerTurn = true;
-    playSound('deal', this.settings);
+    playSound('deal', this.settings, this);
     this.setScreen('PLAYING');
     this.arrangeCards();
   }
@@ -410,10 +418,10 @@ class WhotScene extends Phaser.Scene {
     let pScore = this.calcScore(this.player);
     let cScore = this.calcScore(this.cpu);
     
-    if (reason === 'PLAYER') playSound('win', this.settings);
-    else if (reason === 'CPU') playSound('lose', this.settings);
-    else if (pScore <= cScore) playSound('win', this.settings);
-    else playSound('lose', this.settings);
+    if (reason === 'PLAYER') playSound('win', this.settings, this);
+    else if (reason === 'CPU') playSound('lose', this.settings, this);
+    else if (pScore <= cScore) playSound('win', this.settings, this);
+    else playSound('lose', this.settings, this);
     
     this.playerScore = pScore;
     this.cpuScore = cScore;
@@ -441,7 +449,7 @@ class WhotScene extends Phaser.Scene {
         }
         if (this.deck.length > 0) hand.push(this.deck.pop());
       }
-      playSound('deal', this.settings);
+      playSound('deal', this.settings, this);
       this.showMsg(isPlayer ? 'YOU DRAW' : 'CPU DRAWS', '#f1c40f');
       this.isPlayerTurn = !isPlayer;
       this.arrangeCards();
@@ -451,7 +459,7 @@ class WhotScene extends Phaser.Scene {
 
     const card = hand[idx];
     if (isPlayer && !this.canPlay(card)) {
-      playSound('error', this.settings);
+      playSound('error', this.settings, this);
       this.showMsg('INVALID MOVE!', '#e74c3c');
       return;
     }
@@ -463,20 +471,20 @@ class WhotScene extends Phaser.Scene {
     this.neededSuit = null;
 
     if (hand.length === 0) {
-      playSound('play', this.settings);
+      playSound('play', this.settings, this);
       return this.gameOver(isPlayer ? 'PLAYER' : 'CPU');
     }
 
     let hold = false;
-    if (card.num === 1) { this.showMsg('HOLD ON!', '#f1c40f'); hold = true; playSound('hold', this.settings); }
-    else if (card.num === 2) { this.showMsg('PICK TWO!', '#e74c3c'); this.drawCount += 2; playSound('pick2', this.settings); }
-    else if (card.num === 5 && this.settings.pick3) { this.showMsg('PICK THREE!', '#e74c3c'); this.drawCount += 3; playSound('pick3', this.settings); }
-    else if (card.num === 8 && this.settings.suspend) { this.showMsg('SUSPENSION!', '#f1c40f'); hold = true; playSound('suspend', this.settings); }
-    else if (card.num === 14) { this.showMsg('GEN MARKET!', '#e74c3c'); this.drawCount += 1; playSound('market', this.settings); }
-    else playSound('play', this.settings);
+    if (card.num === 1) { this.showMsg('HOLD ON!', '#f1c40f'); hold = true; playSound('hold', this.settings, this); }
+    else if (card.num === 2) { this.showMsg('PICK TWO!', '#e74c3c'); this.drawCount += 2; playSound('pick2', this.settings, this); }
+    else if (card.num === 5 && this.settings.pick3) { this.showMsg('PICK THREE!', '#e74c3c'); this.drawCount += 3; playSound('pick3', this.settings, this); }
+    else if (card.num === 8 && this.settings.suspend) { this.showMsg('SUSPENSION!', '#f1c40f'); hold = true; playSound('suspend', this.settings, this); }
+    else if (card.num === 14) { this.showMsg('GEN MARKET!', '#e74c3c'); this.drawCount += 1; playSound('market', this.settings, this); }
+    else playSound('play', this.settings, this);
 
     if (card.suit === 'whot') {
-      playSound('whot', this.settings);
+      playSound('whot', this.settings, this);
       if (isPlayer) {
         this.setScreen('WHOT_CHOICE');
         this.arrangeCards();
@@ -485,7 +493,8 @@ class WhotScene extends Phaser.Scene {
         const counts: any = { circle:0, triangle:0, cross:0, square:0, star:0 };
         this.cpu.forEach(c => { if (c.suit !== 'whot') counts[c.suit]++; });
         this.neededSuit = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b);
-        this.showMsg(`CPU NEEDS ${this.neededSuit.toUpperCase()}`, this.getColorHex(this.neededSuit));
+        // Redundant message removed as we have a dedicated indicator
+        // this.showMsg(`CPU NEEDS ${this.neededSuit.toUpperCase()}`, this.getColorHex(this.neededSuit));
       }
     }
 
@@ -506,7 +515,7 @@ class WhotScene extends Phaser.Scene {
   }
 
   handleInput(action: string) {
-    playSound('tick', this.settings);
+    playSound('tick', this.settings, this);
     if (this.screen === 'MENU') {
       if (action === 'UP') this.menuIndex = (this.menuIndex - 1 + 3) % 3;
       else if (action === 'DOWN') this.menuIndex = (this.menuIndex + 1) % 3;
@@ -572,7 +581,7 @@ class WhotScene extends Phaser.Scene {
           } else {
             this.player.push(this.deck.pop());
           }
-          playSound('deal', this.settings);
+          playSound('deal', this.settings, this);
           this.showMsg('YOU DRAW', '#f1c40f');
           this.isPlayerTurn = false;
           this.arrangeCards();
@@ -691,7 +700,8 @@ class WhotScene extends Phaser.Scene {
       if (this.neededSuit && this.screen !== 'WHOT_CHOICE') {
         this.neededText.setText(`I NEED:`);
         this.neededText.setColor('#fff');
-        this.drawShape(this.neededShape, this.neededSuit, 190, 150, 12, COLORS[this.neededSuit]);
+        const textWidth = this.neededText.width;
+        this.drawShape(this.neededShape, this.neededSuit, 10 + textWidth + 10, 16, 8, COLORS[this.neededSuit]);
       } else {
         this.neededText.setText('');
       }
@@ -699,6 +709,8 @@ class WhotScene extends Phaser.Scene {
 
     if (this.screen === 'WHOT_CHOICE') {
       this.whotOverlay.setVisible(true);
+      this.whotOverlay.setAlpha(1);
+      this.whotOverlay.y = 0;
       const cx = 120, cy = 120, r = 50;
       SUITS.forEach((suit, i) => {
         const angle = Math.PI + i * (Math.PI / 4);
@@ -723,6 +735,8 @@ class WhotScene extends Phaser.Scene {
       });
     } else {
       this.whotOverlay.setVisible(false);
+      this.whotOverlay.setAlpha(0);
+      this.whotOverlay.y = 1000;
     }
   }
 

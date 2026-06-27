@@ -263,6 +263,50 @@ const generateWithImageMagick = () => {
   fs.writeFileSync(atlasPath, JSON.stringify(atlas, null, 2));
 };
 
+const generateAudio = () => {
+  console.log('Generating audio assets using FFmpeg...');
+  const audioFiles = [
+    { name: 'deal', f0: 600, f1: 800, d: 0.1, type: 'sine' },
+    { name: 'market', f0: 600, f1: 800, d: 0.1, type: 'sine' },
+    { name: 'play', f0: 400, f1: 200, d: 0.15, type: 'triangle' },
+    { name: 'hold', f0: 400, f1: 200, d: 0.15, type: 'triangle' },
+    { name: 'suspend', f0: 400, f1: 200, d: 0.15, type: 'triangle' },
+    { name: 'error', f0: 150, f1: 100, d: 0.3, type: 'sawtooth' },
+    { name: 'lose', f0: 150, f1: 100, d: 0.3, type: 'sawtooth' },
+    { name: 'pick2', f0: 400, f1: 600, d: 0.4, type: 'square' },
+    { name: 'pick3', f0: 400, f1: 600, d: 0.4, type: 'square' },
+    { name: 'win', f0: 400, f1: 600, d: 0.4, type: 'square' },
+    { name: 'whot', f0: 800, f1: 1200, d: 0.5, type: 'sine' },
+    { name: 'tick', f0: 800, f1: 800, d: 0.05, type: 'square' }
+  ];
+
+  audioFiles.forEach(a => {
+    const outPath = path.join(publicDir, `${a.name}.ogg`);
+    let expr = '';
+    // Basic frequency sweep expression: sin(2*pi*(f0 + (f1-f0)/2/d*t)*t)
+    const sweep = `2*PI*(${a.f0}+(${a.f1}-${a.f0})/2/${a.d}*t)*t`;
+    
+    if (a.type === 'sine') {
+      expr = `sin(${sweep})`;
+    } else if (a.type === 'triangle') {
+      expr = `2/PI*asin(sin(${sweep}))`;
+    } else if (a.type === 'sawtooth') {
+      expr = `2*(t*(${a.f0}+(${a.f1}-${a.f0})/2*t)-floor(t*(${a.f0}+(${a.f1}-${a.f0})/2*t)+0.5))`;
+    } else if (a.type === 'square') {
+      expr = `'gt(sin(${sweep}),0)*2-1'`;
+    }
+
+    try {
+      // Use aevalsrc to generate the waveform and pipe to ogg
+      // We use -ar 44100 for standard sample rate
+      const cmd = `ffmpeg -y -f lavfi -i "aevalsrc=${expr}:d=${a.d}" -c:a libvorbis "${outPath}"`;
+      execSync(cmd, { stdio: 'ignore' });
+    } catch (e) {
+      console.error(`Failed to generate ${a.name}.ogg:`, e.message);
+    }
+  });
+};
+
 if (createCanvas) {
   generateWithCanvas();
 } else {
@@ -277,3 +321,5 @@ if (createCanvas) {
     fs.writeFileSync(spritePath, "");
   }
 }
+
+generateAudio();
