@@ -55,6 +55,11 @@ body, html {
   padding: 20px;
 }
 
+.menu-list.scrollable {
+  justify-content: flex-start;
+  padding: 10px;
+}
+
 .menu-item {
   padding: 10px;
   text-align: center;

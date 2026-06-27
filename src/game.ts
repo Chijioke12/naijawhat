@@ -150,6 +150,7 @@ class WhotScene extends Phaser.Scene {
   skLeft = '';
   skCenter = '';
   skRight = '';
+  playableGlows: Phaser.GameObjects.Graphics[] = [];
   msg = '';
   msgColor = '#fff';
   playerScore = 0;
@@ -362,6 +363,20 @@ class WhotScene extends Phaser.Scene {
   }
 
   msgTimer: any = null;
+  showSelectionHint() {
+    const card = this.player[this.selectedIndex];
+    if (!card) return;
+    const isPlayable = this.canPlay(card);
+    
+    if (card.num === 1) this.showMsg('SPECIAL: HOLD ON', '#f1c40f');
+    else if (card.num === 2) this.showMsg('SPECIAL: PICK TWO', '#f1c40f');
+    else if (card.num === 5 && this.settings.pick3) this.showMsg('SPECIAL: PICK THREE', '#f1c40f');
+    else if (card.num === 8 && this.settings.suspend) this.showMsg('SPECIAL: SUSPEND', '#f1c40f');
+    else if (card.num === 14) this.showMsg('SPECIAL: GEN. MARKET', '#f1c40f');
+    else if (card.suit === 'whot') this.showMsg('SPECIAL: WHOT! (20)', '#f1c40f');
+    else if (isPlayable) this.showMsg('VALID MOVE', '#2ecc71');
+  }
+
   showMsg(msg: string, color: string) {
     this.msg = msg;
     this.msgColor = color;
@@ -517,8 +532,8 @@ class WhotScene extends Phaser.Scene {
       this.syncUI();
     } else if (this.screen === 'PLAYING') {
       if (!this.isPlayerTurn) return;
-      if (action === 'LEFT') { this.selectedIndex = (this.selectedIndex - 1 + this.player.length) % this.player.length; this.arrangeCards(); }
-      else if (action === 'RIGHT') { this.selectedIndex = (this.selectedIndex + 1) % this.player.length; this.arrangeCards(); }
+      if (action === 'LEFT') { this.selectedIndex = (this.selectedIndex - 1 + this.player.length) % this.player.length; this.arrangeCards(); this.showSelectionHint(); }
+      else if (action === 'RIGHT') { this.selectedIndex = (this.selectedIndex + 1) % this.player.length; this.arrangeCards(); this.showSelectionHint(); }
       else if (action === 'UP' || action === 'DOWN') {
         const playableIndices = this.player.map((c, i) => this.canPlay(c) ? i : -1).filter(i => i !== -1);
         if (playableIndices.length > 0) {
@@ -535,6 +550,7 @@ class WhotScene extends Phaser.Scene {
             }
           }
           this.arrangeCards();
+          this.showSelectionHint();
         }
       }
       else if (action === 'OK') this.playTurn(true);
@@ -629,6 +645,9 @@ class WhotScene extends Phaser.Scene {
     });
 
     this.focusCursor.clear();
+    if (!this.playableGlows) this.playableGlows = [];
+    this.playableGlows.forEach(g => g.clear());
+
     this.player.forEach((card, i) => {
       card.x += 0.2 * (card.tx - card.x);
       card.y += 0.2 * (card.ty - card.y);
@@ -637,30 +656,30 @@ class WhotScene extends Phaser.Scene {
       this.drawCardObj(card, true, isSel, isPlayable, 100 + i);
 
       if (isSel) {
-        this.focusCursor.lineStyle(3, 0xffff00, 1);
+        this.focusCursor.setDepth(100 + i + 0.5);
+        this.focusCursor.lineStyle(3, 0xf1c40f, 1);
         const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 150);
         this.focusCursor.alpha = 0.8 + 0.2 * pulse;
         
-        // Selection border adjusted for smaller cards (44px wide)
-        this.focusCursor.strokeRoundedRect(card.x - 2, card.y - 9, 48, 68, 6);
-      }
-      
-      const img = this.cardImages.get(card.id);
-      if (img) {
-        const baseScale = 1.0; // Asset is now 46px wide
-        if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
-          const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
-          const targetScale = isSel ? baseScale * 1.05 : baseScale * (1 + glow * 0.03);
-          img.setScale(targetScale);
-          if (!isSel) img.setTint(0xffffcc);
-        } else {
-          img.setScale(baseScale);
+        // Selection border adjusted for smaller cards (46px wide)
+        // Tighter inset border to avoid covering adjacent cards
+        this.focusCursor.strokeRoundedRect(card.x + 1, card.y - 8, 44, 68, 4);
+      } else if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
+        // Individual playable indicator with depth management to prevent overlap
+        if (!this.playableGlows[i]) {
+          this.playableGlows[i] = this.add.graphics();
         }
+        const g = this.playableGlows[i];
+        g.setDepth(100 + i + 0.1); // Slightly above the card but below the selection
+        g.lineStyle(2, 0x2ecc71, 0.7);
+        // More inset to stay clearly within the card face
+        g.strokeRoundedRect(card.x + 4, card.y + 4, 38, 60, 4);
       }
     });
 
     if (!this.isPlayerTurn || this.screen !== 'PLAYING') {
       this.focusCursor.clear();
+      if (this.playableGlows) this.playableGlows.forEach(g => g.clear());
     }
 
     const neededKey = `${this.neededSuit}_${this.screen}`;
@@ -727,23 +746,34 @@ class WhotScene extends Phaser.Scene {
       img.setPosition(card.x, displayY);
     }
     img.setDepth(depth);
-    img.setScale(1.0);
+    
+    // Scale logic
+    let baseScale = 1.0;
     
     if (depth >= 100) {
       if (isSelected) {
         img.setTint(0xffffff);
+        baseScale = 1.05; // Slightly larger when selected
       } else {
-        if (isPlayable) {
-          img.setTint(0xffffff);
-        } else {
+        if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
+          // Playable highlight: Slight green tint and subtle pulse
+          const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
+          baseScale = 1.0 + glow * 0.03;
+          img.setTint(0xccffcc); // Subtle green tint for playable cards
+          
+          // Optionally add a more distinct indicator if needed, but tint + scale pulse is usually enough
+        } else if (!isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
           // Dim non-playable cards more clearly
           img.setTint(0x666666);
+        } else {
+          img.setTint(0xffffff);
         }
       }
     } else {
       img.clearTint();
-      img.setScale(46 / 184, 68 / 272);
+      baseScale = 0.95; // CPU and other background cards
     }
+    img.setScale(baseScale);
   }
 
   drawShape(g: Phaser.GameObjects.Graphics, shape: string, x: number, y: number, size: number, color: number) {

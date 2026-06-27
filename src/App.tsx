@@ -19,6 +19,18 @@ export default function App() {
   });
 
   const gameInstance = useRef<WhotGame | null>(null);
+  const settingsListRef = useRef<HTMLDivElement>(null);
+
+  const { screen, msg, msgColor, settings, menuIndex, settingIndex, cpuScore, playerScore, skLeft, skCenter, skRight } = gameState;
+
+  useEffect(() => {
+    if (screen === 'SETTINGS' && settingsListRef.current) {
+      const activeItem = settingsListRef.current.querySelector('.setting-item.active');
+      if (activeItem) {
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [settingIndex, screen]);
 
   useEffect(() => {
     if (gameRef.current && !gameInstance.current) {
@@ -53,8 +65,6 @@ export default function App() {
     gameInstance.current?.handleInput(action);
   };
 
-  const { screen, msg, msgColor, settings, menuIndex, settingIndex, cpuScore, playerScore, skLeft, skCenter, skRight } = gameState;
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div className="device-container">
@@ -86,7 +96,7 @@ export default function App() {
 
         <div className={`screen-overlay ${screen === 'SETTINGS' ? '' : 'hidden'}`}>
           <div className="title">SETTINGS</div>
-          <div className="menu-list">
+          <div className="menu-list scrollable" ref={settingsListRef} style={{ maxHeight: '180px', overflowY: 'auto' }}>
             {[
               { key: 'sfx', label: 'Sound FX' },
               { key: 'aiBanter', label: 'AI Banter' },
