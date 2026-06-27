@@ -179,7 +179,15 @@ class WhotScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.atlas('whot', 'whot_spritesheet.png', 'whot_atlas.json');
+    this.load.on('loaderror', (fileObj: any) => {
+      console.error('Error loading:', fileObj.key, fileObj.src);
+    });
+    this.load.on('filecomplete', (key: string) => {
+      console.log('Loaded:', key);
+    });
+
+    // Use explicit relative paths for better reliability on KaiOS/OmniSD
+    this.load.atlas('whot', './whot_spritesheet.png', './whot_atlas.json');
   }
 
   create() {
@@ -639,7 +647,7 @@ class WhotScene extends Phaser.Scene {
       
       const img = this.cardImages.get(card.id);
       if (img) {
-        const baseScale = 44 / 184; // Effectively 44px wide
+        const baseScale = 1.0; // Asset is now 46px wide
         if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
           const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
           const targetScale = isSel ? baseScale * 1.05 : baseScale * (1 + glow * 0.03);
@@ -719,7 +727,7 @@ class WhotScene extends Phaser.Scene {
       img.setPosition(card.x, displayY);
     }
     img.setDepth(depth);
-    img.setScale(44 / 184, 64 / 272);
+    img.setScale(1.0);
     
     if (depth >= 100) {
       if (isSelected) {

@@ -31,8 +31,8 @@ const COLORS = {
 };
 
 // Target high-res dimensions for sharpness
-const CARD_W = 184; // 46 * 4
-const CARD_H = 272; // 68 * 4
+const CARD_W = 46;
+const CARD_H = 68;
 const COLS = 10;
 const ROWS = 6;
 
@@ -126,49 +126,48 @@ const generateWithCanvas = () => {
     if (index !== undefined) name = `${name}_${index}`;
     
     const { x, y } = addFrame(name);
-    const w = CARD_W - 8;
-    const h = CARD_H - 8;
-    const cx = x + 4;
-    const cy = y + 4;
+    const w = CARD_W - 4;
+    const h = CARD_H - 4;
+    const cx = x + 2;
+    const cy = y + 2;
 
     ctx.save();
-    drawRoundedRect(ctx, cx, cy, w, h, 16);
+    drawRoundedRect(ctx, cx, cy, w, h, 6);
     ctx.fillStyle = isBack ? COLORS.back.base : '#ffffff';
     ctx.fill();
     ctx.strokeStyle = isBack ? '#f1c40f' : '#dddddd';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1;
     ctx.stroke();
 
     if (isBack) {
       ctx.fillStyle = '#f1c40f';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 32px Arial';
+      ctx.font = 'bold 8px Arial';
       ctx.fillText('WHOT!', cx + w / 2, cy + h / 2);
     } else {
       ctx.fillStyle = COLORS[suit].base;
-      ctx.font = 'bold 48px Arial';
+      ctx.font = 'bold 10px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(num.toString(), cx + 32, cy + 16);
+      ctx.fillText(num.toString(), cx + 8, cy + 4);
       
       ctx.save();
-      ctx.translate(cx + w - 32, cy + h - 16);
+      ctx.translate(cx + w - 8, cy + h - 4);
       ctx.rotate(Math.PI);
       ctx.fillText(num.toString(), 0, 0);
       ctx.restore();
 
       if (suit === 'whot') {
         ctx.fillStyle = '#111';
-        ctx.font = 'bold 48px Arial';
-        ctx.fillText('WHOT', cx + w / 2, cy + h / 2 - 20);
-        ctx.font = 'bold 40px Arial';
-        ctx.fillText('20', cx + w / 2, cy + h / 2 + 30);
+        ctx.font = 'bold 8px Arial';
+        ctx.fillText('WHOT', cx + w / 2, cy + h / 2 - 4);
+        ctx.fillText('20', cx + w / 2, cy + h / 2 + 6);
       } else {
-        drawSymbol(ctx, suit, cx + w / 2, cy + h / 2, 40, COLORS[suit]);
+        drawSymbol(ctx, suit, cx + w / 2, cy + h / 2, 12, COLORS[suit]);
         if (suit === 'star') {
-           ctx.font = 'bold 32px Arial';
-           ctx.fillText(`(${num * 2})`, cx + w / 2, cy + h / 2 + 56);
+           ctx.font = 'bold 8px Arial';
+           ctx.fillText(`(${num * 2})`, cx + w / 2, cy + h / 2 + 14);
         }
       }
     }
