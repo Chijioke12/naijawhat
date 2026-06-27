@@ -4,7 +4,49 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Naija Whot HD</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.24.1/phaser.min.js"></script>
+    <script>
+      function showOnScreenError(title, error) {
+        var el = document.getElementById('error-overlay');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'error-overlay';
+          el.style.position = 'fixed';
+          el.style.top = '0';
+          el.style.left = '0';
+          el.style.width = '100%';
+          el.style.height = '100%';
+          el.style.background = 'rgba(0,0,0,0.9)';
+          el.style.color = '#ff6b6b';
+          el.style.padding = '15px';
+          el.style.fontFamily = 'monospace';
+          el.style.fontSize = '12px';
+          el.style.zIndex = '999999';
+          el.style.boxSizing = 'border-box';
+          el.style.overflowY = 'auto';
+          el.innerHTML = '<h2 style="margin-top:0;color:#ff3333;">⚠️ Runtime Error</h2><div id="error-details"></div>';
+          document.body.appendChild(el);
+        }
+        var details = document.getElementById('error-details');
+        var message = '';
+        if (typeof error === 'object' && error !== null) {
+          message = '<strong>' + title + ':</strong> ' + (error.message || error.toString()) + '<br/><br/>' +
+                    (error.stack ? '<pre style="white-space:pre-wrap;background:#1a1a1a;padding:10px;border-radius:4px;color:#ccc;">' + error.stack + '</pre>' : '');
+        } else {
+          message = '<strong>' + title + ':</strong> ' + String(error);
+        }
+        details.innerHTML += '<div style="margin-bottom:15px;border-bottom:1px solid #333;padding-bottom:10px;">' + message + '</div>';
+      }
+
+      window.addEventListener('error', function(e) {
+        console.error('GLOBAL ERROR:', e.message, 'at', e.filename, ':', e.lineno);
+        showOnScreenError('Uncaught Error', e.error || { message: e.message, stack: e.filename + ':' + e.lineno });
+      });
+
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('UNHANDLED REJECTION:', e.reason);
+        showOnScreenError('Unhandled Promise Rejection', e.reason);
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>

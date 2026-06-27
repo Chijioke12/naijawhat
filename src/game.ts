@@ -102,12 +102,20 @@ export class WhotGame {
   
   constructor(parent: string | HTMLElement) {
     const config: Phaser.Types.Core.GameConfig = {
-      type: Phaser.AUTO,
+      type: Phaser.CANVAS, // Force Canvas renderer which is hardware-accelerated/well-optimized on low-end Gecko (KaiOS)
       width: 240,
       height: 295,
       parent: parent,
       transparent: true,
-      scene: WhotScene
+      scene: WhotScene,
+      fps: {
+        target: 30, // 30 FPS target is perfect for a card game and reduces CPU load
+        forceSetTimeOut: true
+      },
+      render: {
+        antialias: false,
+        pixelArt: true
+      }
     };
     this.game = new Phaser.Game(config);
   }
@@ -540,19 +548,31 @@ class WhotScene extends Phaser.Scene {
   }
 
   update() {
-    if (this.deck.length > 0) {
-      this.deckText.setText(this.deck.length.toString());
-      this.deckText.setDepth(11);
+    const deckLen = this.deck.length;
+    if (this.deckText.getData('len') !== deckLen) {
+      this.deckText.setData('len', deckLen);
+      if (deckLen > 0) {
+        this.deckText.setText(deckLen.toString());
+        this.deckText.setDepth(11);
+      } else {
+        this.deckText.setText('');
+      }
+    }
+
+    if (deckLen > 0) {
       this.drawCardObj({ id: 'market', suit: 'whot', num: '', x: 20, y: 110 }, false, false, false, 10);
     } else {
-      this.deckText.setText('');
       if (this.cardContainers.has('market')) {
         this.cardContainers.get('market')?.destroy();
         this.cardContainers.delete('market');
       }
     }
 
-    this.cpuText.setText(`CPU: ${this.cpu.length}`);
+    const cpuLen = this.cpu.length;
+    if (this.cpuText.getData('len') !== cpuLen) {
+      this.cpuText.setData('len', cpuLen);
+      this.cpuText.setText(`CPU: ${cpuLen}`);
+    }
 
     this.pile.forEach((card, i) => {
       card.x += 0.2 * (card.tx - card.x);
@@ -580,11 +600,15 @@ class WhotScene extends Phaser.Scene {
       this.drawCardObj(card, true, isSel, isPlayable, 100 + i);
     });
 
-    if (this.neededSuit && this.screen !== 'WHOT_CHOICE') {
-      this.neededText.setText(`NEEDED:\n${this.neededSuit.toUpperCase()}`);
-      this.neededText.setColor(this.getColorHex(this.neededSuit));
-    } else {
-      this.neededText.setText('');
+    const neededKey = `${this.neededSuit}_${this.screen}`;
+    if (this.neededText.getData('neededKey') !== neededKey) {
+      this.neededText.setData('neededKey', neededKey);
+      if (this.neededSuit && this.screen !== 'WHOT_CHOICE') {
+        this.neededText.setText(`NEEDED:\n${this.neededSuit.toUpperCase()}`);
+        this.neededText.setColor(this.getColorHex(this.neededSuit));
+      } else {
+        this.neededText.setText('');
+      }
     }
 
     if (this.screen === 'WHOT_CHOICE') {
@@ -597,14 +621,19 @@ class WhotScene extends Phaser.Scene {
         const isSel = i === this.whotChoiceIndex;
         const size = isSel ? 16 : 10;
         let g = this.whotShapes[i];
-        g.clear();
-        if (isSel) {
-          g.fillStyle(0xf1c40f, 0.2);
-          g.fillCircle(px, py, 20);
-          g.lineStyle(2, 0xf1c40f);
-          g.strokeCircle(px, py, 20);
+        
+        if (g.getData('size') !== size || g.getData('isSel') !== isSel) {
+          g.setData('size', size);
+          g.setData('isSel', isSel);
+          g.clear();
+          if (isSel) {
+            g.fillStyle(0xf1c40f, 0.2);
+            g.fillCircle(px, py, 20);
+            g.lineStyle(2, 0xf1c40f);
+            g.strokeCircle(px, py, 20);
+          }
+          this.drawShape(g, suit, px, py, size, COLORS[suit]);
         }
-        this.drawShape(g, suit, px, py, size, COLORS[suit]);
       });
     } else {
       this.whotOverlay.setVisible(false);
@@ -613,6 +642,7 @@ class WhotScene extends Phaser.Scene {
 
   drawCardObj(card: any, faceUp: boolean, isSelected: boolean, isPlayable: boolean, depth: number) {
     let c = this.cardContainers.get(card.id);
+    let needsRedraw = false;
     if (!c) {
       c = this.add.container(card.x, card.y);
       let bg = this.add.graphics();
@@ -623,9 +653,25 @@ class WhotScene extends Phaser.Scene {
       let shape = this.add.graphics();
       c.add([bg, textTop, textSub, centerText, subCenterText, shape]);
       this.cardContainers.set(card.id, c);
+      needsRedraw = true;
     }
+    
     c.setPosition(card.x, card.y);
     c.setDepth(depth);
+    
+    // Check if any visual state changed before redrawing the expensive vector graphics paths
+    if (c.getData('faceUp') !== faceUp || 
+        c.getData('isSelected') !== isSelected || 
+        c.getData('isPlayable') !== isPlayable) {
+      needsRedraw = true;
+      c.setData('faceUp', faceUp);
+      c.setData('isSelected', isSelected);
+      c.setData('isPlayable', isPlayable);
+    }
+    
+    if (!needsRedraw) {
+      return;
+    }
     
     let bg = c.list[0] as Phaser.GameObjects.Graphics;
     let textTop = c.list[1] as Phaser.GameObjects.Text;
