@@ -93,6 +93,11 @@ const drawSymbol = (ctx, suit, x, y, size, colors) => {
   ctx.restore();
 };
 
+// Use absolute paths to avoid issues when running from scripts/ directory
+const publicDir = path.join(__dirname, '..', 'public');
+const spritePath = path.join(publicDir, 'whot_spritesheet.png');
+const atlasPath = path.join(publicDir, 'whot_atlas.json');
+
 const generateWithCanvas = () => {
   const canvas = createCanvas(CARD_W * COLS, CARD_H * ROWS);
   const ctx = canvas.getContext('2d');
@@ -186,15 +191,13 @@ const generateWithCanvas = () => {
     }]
   };
 
-  const out = fs.createWriteStream("public/whot_spritesheet.png");
+  const out = fs.createWriteStream(spritePath);
   canvas.createPNGStream().pipe(out);
-  fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
+  fs.writeFileSync(atlasPath, JSON.stringify(atlas, null, 2));
 };
 
 const generateWithImageMagick = () => {
   console.log('Generating assets using ImageMagick...');
-  // Since full card drawing with IM CLI is very complex, 
-  // we'll generate a simpler but sharp version using 'convert'.
   
   const frames = [];
   let col = 0, row = 0;
@@ -213,7 +216,7 @@ const generateWithImageMagick = () => {
   };
 
   // Create empty spritesheet
-  execSync(`convert -size ${CARD_W * COLS}x${CARD_H * ROWS} xc:none public/whot_spritesheet.png`);
+  execSync(`convert -size ${CARD_W * COLS}x${CARD_H * ROWS} xc:none "${spritePath}"`);
 
   const drawCard = (suit, num, isBack, index) => {
     let name = isBack ? 'back' : (suit === 'whot' ? `whot_${num}` : `${suit}_${num}`);
@@ -225,7 +228,7 @@ const generateWithImageMagick = () => {
     const textColor = isBack ? '#f1c40f' : (suit ? COLORS[suit].base : 'black');
     
     // Draw base card
-    let cmd = `convert public/whot_spritesheet.png -fill "${bgColor}" -stroke "${borderColor}" -strokewidth 2 ` +
+    let cmd = `convert "${spritePath}" -fill "${bgColor}" -stroke "${borderColor}" -strokewidth 2 ` +
               `-draw "roundrectangle ${x+4},${y+4} ${x+CARD_W-4},${y+CARD_H-4} 16,16" `;
     
     if (isBack) {
@@ -240,7 +243,7 @@ const generateWithImageMagick = () => {
         cmd += `-pointsize 32 -draw "text ${x+CARD_W/2-20},${y+CARD_H/2} '${suit[0].toUpperCase()}'" `;
       }
     }
-    execSync(cmd + ` public/whot_spritesheet.png`);
+    execSync(cmd + ` "${spritePath}"`);
   };
 
   drawCard(null, null, true);
@@ -258,7 +261,7 @@ const generateWithImageMagick = () => {
       frames
     }]
   };
-  fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
+  fs.writeFileSync(atlasPath, JSON.stringify(atlas, null, 2));
 };
 
 if (createCanvas) {
@@ -271,7 +274,7 @@ if (createCanvas) {
     console.log('Generating fallback blank spritesheet.');
     // Minimal fallback to prevent crash
     const atlas = { textures: [{ image: "whot_spritesheet.png", format: "RGBA8888", size: { w: 1, h: 1 }, scale: 1, frames: [] }] };
-    fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
-    fs.writeFileSync("public/whot_spritesheet.png", "");
+    fs.writeFileSync(atlasPath, JSON.stringify(atlas, null, 2));
+    fs.writeFileSync(spritePath, "");
   }
 }

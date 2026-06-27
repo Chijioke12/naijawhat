@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "generate-assets": "node scripts/generate-assets.cjs",
+    "build": "npm run generate-assets && vite build",
     "build:omnisd": "npm run build && node scripts/build-omnisd.js",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js omnisd_build NaijaWhotHD_OmniSD.zip",
