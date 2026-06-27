@@ -1,5 +1,15 @@
 const fs = require('fs');
-const { createCanvas } = require('canvas');
+const path = require('path');
+const { execSync } = require('child_process');
+
+let createCanvas;
+try {
+  const canvas = require('canvas');
+  createCanvas = canvas.createCanvas;
+  console.log('Using node-canvas for asset generation.');
+} catch (e) {
+  console.log('node-canvas not found or failed to load. Falling back to ImageMagick.');
+}
 
 const targetPlatform = 'kaios';
 const SUITS = {
@@ -20,6 +30,12 @@ const COLORS = {
   back: { base: '#1a2a6c', grad: '#b21f1f' }
 };
 
+// Target high-res dimensions for sharpness
+const CARD_W = 184; // 46 * 4
+const CARD_H = 272; // 68 * 4
+const COLS = 10;
+const ROWS = 6;
+
 const drawRoundedRect = (ctx, x, y, w, h, r) => {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -38,12 +54,9 @@ const drawSymbol = (ctx, suit, x, y, size, colors) => {
   ctx.save();
   ctx.translate(x, y);
   
-  const grad = ctx.createLinearGradient(-size, -size, size, size);
-  grad.addColorStop(0, colors.grad);
-  grad.addColorStop(1, colors.base);
-  ctx.fillStyle = grad;
+  ctx.fillStyle = colors.base;
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = Math.max(1, size * 0.15);
+  ctx.lineWidth = Math.max(2, size * 0.15);
   ctx.lineJoin = 'round';
   
   ctx.beginPath();
@@ -54,17 +67,8 @@ const drawSymbol = (ctx, suit, x, y, size, colors) => {
     ctx.lineTo(size * 1.1, size * 0.8);
     ctx.lineTo(-size * 1.1, size * 0.8);
   } else if (suit === 'square') {
-    const r = size * 0.2;
     const s = size * 0.9;
-    ctx.moveTo(-s + r, -s);
-    ctx.lineTo(s - r, -s);
-    ctx.quadraticCurveTo(s, -s, s, -s + r);
-    ctx.lineTo(s, s - r);
-    ctx.quadraticCurveTo(s, s, s - r, s);
-    ctx.lineTo(-s + r, s);
-    ctx.quadraticCurveTo(-s, s, -s, s - r);
-    ctx.lineTo(-s, -s + r);
-    ctx.quadraticCurveTo(-s, -s, -s + r, -s);
+    ctx.rect(-s, -s, s * 2, s * 2);
   } else if (suit === 'cross') {
     const w = size * 0.35;
     const s = size;
@@ -84,24 +88,14 @@ const drawSymbol = (ctx, suit, x, y, size, colors) => {
     }
   }
   ctx.closePath();
-  
   ctx.fill();
   ctx.stroke();
   ctx.restore();
 };
 
-const generateSpriteSheet = () => {
-  // Use exact target dimensions for sharpness
-  const CARD_W = 46;
-  const CARD_H = 68;
-  const COLS = 10;
-  const ROWS = 6;
-  
+const generateWithCanvas = () => {
   const canvas = createCanvas(CARD_W * COLS, CARD_H * ROWS);
   const ctx = canvas.getContext('2d');
-  
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const frames = [];
   let col = 0;
   let row = 0;
@@ -122,112 +116,162 @@ const generateSpriteSheet = () => {
     return { x, y };
   };
 
-  const drawCardBase = (x, y, isBack) => {
-    const w = CARD_W - 2;
-    const h = CARD_H - 2;
-    const cx = x + 1;
-    const cy = y + 1;
+  const drawCard = (suit, num, isBack, index) => {
+    let name = isBack ? 'back' : (suit === 'whot' ? `whot_${num}` : `${suit}_${num}`);
+    if (index !== undefined) name = `${name}_${index}`;
+    
+    const { x, y } = addFrame(name);
+    const w = CARD_W - 8;
+    const h = CARD_H - 8;
+    const cx = x + 4;
+    const cy = y + 4;
 
     ctx.save();
-    drawRoundedRect(ctx, cx, cy, w, h, 4);
-    
-    if (isBack) {
-      ctx.fillStyle = COLORS.back.base;
-    } else {
-      ctx.fillStyle = '#ffffff';
-    }
-    
+    drawRoundedRect(ctx, cx, cy, w, h, 16);
+    ctx.fillStyle = isBack ? COLORS.back.base : '#ffffff';
     ctx.fill();
     ctx.strokeStyle = isBack ? '#f1c40f' : '#dddddd';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     if (isBack) {
       ctx.fillStyle = '#f1c40f';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = 'bold 10px Arial';
+      ctx.font = 'bold 32px Arial';
       ctx.fillText('WHOT!', cx + w / 2, cy + h / 2);
-    }
-
-    ctx.restore();
-    return { cx, cy, w, h };
-  };
-
-  const drawCard = (suit, num, index) => {
-    let name = suit === 'whot' ? `whot_${num}` : `${suit}_${num}`;
-    if (index !== undefined) {
-      name = `${name}_${index}`;
-    }
-    const { x, y } = addFrame(name);
-    const { cx, cy, w, h } = drawCardBase(x, y, false);
-    const colors = COLORS[suit];
-
-    ctx.save();
-    
-    ctx.fillStyle = colors.base;
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(num.toString(), cx + 8, cy + 4);
-    
-    // Draw inverted number at bottom
-    ctx.save();
-    ctx.translate(cx + w - 8, cy + h - 4);
-    ctx.rotate(Math.PI);
-    ctx.fillText(num.toString(), 0, 0);
-    ctx.restore();
-
-    if (suit === 'whot') {
-      ctx.fillStyle = '#111';
-      ctx.font = 'bold 12px Arial';
-      ctx.fillText('WHOT', cx + w / 2, cy + h / 2 - 5);
-      ctx.font = 'bold 10px Arial';
-      ctx.fillText('20', cx + w / 2, cy + h / 2 + 8);
     } else {
-      drawSymbol(ctx, suit, cx + w / 2, cy + h / 2, 10, colors);
-      if (suit === 'star') {
-         ctx.fillStyle = colors.base;
-         ctx.font = 'bold 8px Arial';
-         ctx.fillText(`(${num * 2})`, cx + w / 2, cy + h / 2 + 14);
+      ctx.fillStyle = COLORS[suit].base;
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(num.toString(), cx + 32, cy + 16);
+      
+      ctx.save();
+      ctx.translate(cx + w - 32, cy + h - 16);
+      ctx.rotate(Math.PI);
+      ctx.fillText(num.toString(), 0, 0);
+      ctx.restore();
+
+      if (suit === 'whot') {
+        ctx.fillStyle = '#111';
+        ctx.font = 'bold 48px Arial';
+        ctx.fillText('WHOT', cx + w / 2, cy + h / 2 - 20);
+        ctx.font = 'bold 40px Arial';
+        ctx.fillText('20', cx + w / 2, cy + h / 2 + 30);
+      } else {
+        drawSymbol(ctx, suit, cx + w / 2, cy + h / 2, 40, COLORS[suit]);
+        if (suit === 'star') {
+           ctx.font = 'bold 32px Arial';
+           ctx.fillText(`(${num * 2})`, cx + w / 2, cy + h / 2 + 56);
+        }
       }
     }
     ctx.restore();
   };
 
-  const bpos = addFrame('back');
-  drawCardBase(bpos.x, bpos.y, true);
-
-  for (let i = 1; i <= 5; i++) {
-    drawCard('whot', 20, i);
-  }
-
+  drawCard(null, null, true);
+  for (let i = 1; i <= 5; i++) drawCard('whot', 20, false, i);
   for (const suit in SUITS) {
-    for (const num of SUITS[suit]) {
-      drawCard(suit, num);
-    }
+    for (const num of SUITS[suit]) drawCard(suit, num, false);
   }
 
   const atlas = {
-    textures: [
-      {
-        image: "whot_spritesheet.png",
-        format: "RGBA8888",
-        size: { w: canvas.width, h: canvas.height },
-        scale: 1,
-        frames
-      }
-    ]
+    textures: [{
+      image: "whot_spritesheet.png",
+      format: "RGBA8888",
+      size: { w: canvas.width, h: canvas.height },
+      scale: 1,
+      frames
+    }]
   };
 
   const out = fs.createWriteStream("public/whot_spritesheet.png");
-  const stream = canvas.createPNGStream();
-  stream.pipe(out);
-  out.on('finish', () => console.log('whot_spritesheet.png was created.'));
-
+  canvas.createPNGStream().pipe(out);
   fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
-  console.log('whot_atlas.json was created.');
 };
 
-console.log('Generating Whot assets for ' + targetPlatform + ' platform...');
-generateSpriteSheet();
+const generateWithImageMagick = () => {
+  console.log('Generating assets using ImageMagick...');
+  // Since full card drawing with IM CLI is very complex, 
+  // we'll generate a simpler but sharp version using 'convert'.
+  
+  const frames = [];
+  let col = 0, row = 0;
+
+  const addFrame = (name) => {
+    const x = col * CARD_W, y = row * CARD_H;
+    frames.push({
+      filename: name,
+      frame: { x, y, w: CARD_W, h: CARD_H },
+      rotated: false, trimmed: false,
+      spriteSourceSize: { x: 0, y: 0, w: CARD_W, h: CARD_H },
+      sourceSize: { w: CARD_W, h: CARD_H }
+    });
+    col++; if (col >= COLS) { col = 0; row++; }
+    return { x, y };
+  };
+
+  // Create empty spritesheet
+  execSync(`convert -size ${CARD_W * COLS}x${CARD_H * ROWS} xc:none public/whot_spritesheet.png`);
+
+  const drawCard = (suit, num, isBack, index) => {
+    let name = isBack ? 'back' : (suit === 'whot' ? `whot_${num}` : `${suit}_${num}`);
+    if (index !== undefined) name = `${name}_${index}`;
+    const { x, y } = addFrame(name);
+    
+    const bgColor = isBack ? COLORS.back.base : 'white';
+    const borderColor = isBack ? '#f1c40f' : '#dddddd';
+    const textColor = isBack ? '#f1c40f' : (suit ? COLORS[suit].base : 'black');
+    
+    // Draw base card
+    let cmd = `convert public/whot_spritesheet.png -fill "${bgColor}" -stroke "${borderColor}" -strokewidth 2 ` +
+              `-draw "roundrectangle ${x+4},${y+4} ${x+CARD_W-4},${y+CARD_H-4} 16,16" `;
+    
+    if (isBack) {
+      cmd += `-fill "${textColor}" -stroke none -font Arial-Bold -pointsize 32 -gravity North -draw "text ${x},${y+CARD_H/2-16} 'WHOT!'" `;
+    } else {
+      cmd += `-fill "${textColor}" -stroke none -font Arial-Bold -pointsize 48 -draw "text ${x+16},${y+60} '${num}'" `;
+      if (suit === 'whot') {
+        cmd += `-pointsize 48 -draw "text ${x+CARD_W/2-60},${y+CARD_H/2} 'WHOT'" ` +
+               `-pointsize 40 -draw "text ${x+CARD_W/2-25},${y+CARD_H/2+40} '20'" `;
+      } else {
+        // Simple shape representation for IM fallback
+        cmd += `-pointsize 32 -draw "text ${x+CARD_W/2-20},${y+CARD_H/2} '${suit[0].toUpperCase()}'" `;
+      }
+    }
+    execSync(cmd + ` public/whot_spritesheet.png`);
+  };
+
+  drawCard(null, null, true);
+  for (let i = 1; i <= 5; i++) drawCard('whot', 20, false, i);
+  for (const suit in SUITS) {
+    for (const num of SUITS[suit]) drawCard(suit, num, false);
+  }
+
+  const atlas = {
+    textures: [{
+      image: "whot_spritesheet.png",
+      format: "RGBA8888",
+      size: { w: CARD_W * COLS, h: CARD_H * ROWS },
+      scale: 1,
+      frames
+    }]
+  };
+  fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
+};
+
+if (createCanvas) {
+  generateWithCanvas();
+} else {
+  try {
+    generateWithImageMagick();
+  } catch (e) {
+    console.error('ImageMagick failed:', e.message);
+    console.log('Generating fallback blank spritesheet.');
+    // Minimal fallback to prevent crash
+    const atlas = { textures: [{ image: "whot_spritesheet.png", format: "RGBA8888", size: { w: 1, h: 1 }, scale: 1, frames: [] }] };
+    fs.writeFileSync("public/whot_atlas.json", JSON.stringify(atlas, null, 2));
+    fs.writeFileSync("public/whot_spritesheet.png", "");
+  }
+}

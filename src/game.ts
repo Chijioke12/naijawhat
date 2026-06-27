@@ -1,4 +1,5 @@
-import Phaser from 'phaser';
+// Using global Phaser from script tag to avoid bundling
+declare const Phaser: any;
 
 const SUITS = ['circle', 'triangle', 'cross', 'square', 'star'];
 const COLORS: Record<string, number> = {
@@ -113,8 +114,9 @@ export class WhotGame {
         forceSetTimeOut: true
       },
       render: {
-        antialias: false,
-        pixelArt: true
+        antialias: true,
+        pixelArt: false,
+        roundPixels: true
       }
     };
     this.game = new Phaser.Game(config);
@@ -319,11 +321,11 @@ class WhotScene extends Phaser.Scene {
     const cpuStart = 120 - (this.cpu.length - 1) * cpuSpacing / 2 - 23;
     this.cpu.forEach((c, i) => { c.tx = cpuStart + i * cpuSpacing; c.ty = 10; });
 
-    const pSpacing = Math.min(30, 200 / Math.max(1, this.player.length));
-    const pStart = 120 - (this.player.length - 1) * pSpacing / 2 - 23;
+    const pSpacing = Math.min(35, 200 / Math.max(1, this.player.length));
+    const pStart = 120 - (this.player.length - 1) * pSpacing / 2 - 22;
     this.player.forEach((c, i) => {
       c.tx = pStart + i * pSpacing;
-      c.ty = (i === this.selectedIndex && this.isPlayerTurn) ? 200 : 210;
+      c.ty = (i === this.selectedIndex && this.isPlayerTurn) ? 195 : 210;
     });
 
     if (this.selectedIndex >= this.player.length) this.selectedIndex = Math.max(0, this.player.length - 1);
@@ -618,6 +620,7 @@ class WhotScene extends Phaser.Scene {
       this.drawCardObj(card, false, false, false, 50 + i);
     });
 
+    this.focusCursor.clear();
     this.player.forEach((card, i) => {
       card.x += 0.2 * (card.tx - card.x);
       card.y += 0.2 * (card.ty - card.y);
@@ -626,11 +629,25 @@ class WhotScene extends Phaser.Scene {
       this.drawCardObj(card, true, isSel, isPlayable, 100 + i);
 
       if (isSel) {
-        this.focusCursor.clear();
-        this.focusCursor.lineStyle(2, 0xf1c40f, 1);
+        this.focusCursor.lineStyle(3, 0xffff00, 1);
         const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 150);
-        this.focusCursor.alpha = 0.5 + 0.5 * pulse;
-        this.focusCursor.strokeRoundedRect(card.x - 1, card.y - 9, 48, 70, 5);
+        this.focusCursor.alpha = 0.8 + 0.2 * pulse;
+        
+        // Selection border adjusted for smaller cards (44px wide)
+        this.focusCursor.strokeRoundedRect(card.x - 2, card.y - 9, 48, 68, 6);
+      }
+      
+      const img = this.cardImages.get(card.id);
+      if (img) {
+        const baseScale = 44 / 184; // Effectively 44px wide
+        if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
+          const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
+          const targetScale = isSel ? baseScale * 1.05 : baseScale * (1 + glow * 0.03);
+          img.setScale(targetScale);
+          if (!isSel) img.setTint(0xffffcc);
+        } else {
+          img.setScale(baseScale);
+        }
       }
     });
 
@@ -702,15 +719,22 @@ class WhotScene extends Phaser.Scene {
       img.setPosition(card.x, displayY);
     }
     img.setDepth(depth);
+    img.setScale(44 / 184, 64 / 272);
     
     if (depth >= 100) {
       if (isSelected) {
-        img.setTint(isPlayable ? 0xffffff : 0xaaaaaa);
+        img.setTint(0xffffff);
       } else {
-        img.setTint(isPlayable ? 0xffffff : 0x888888);
+        if (isPlayable) {
+          img.setTint(0xffffff);
+        } else {
+          // Dim non-playable cards more clearly
+          img.setTint(0x666666);
+        }
       }
     } else {
       img.clearTint();
+      img.setScale(46 / 184, 68 / 272);
     }
   }
 
