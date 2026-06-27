@@ -164,7 +164,8 @@ class WhotScene extends Phaser.Scene {
   drawCount = 0;
   isPlayerTurn = false;
   
-  cardContainers: Map<string, Phaser.GameObjects.Container> = new Map();
+  cardImages: Map<string, Phaser.GameObjects.Image> = new Map();
+  focusCursor!: Phaser.GameObjects.Graphics;
   deckText!: Phaser.GameObjects.Text;
   cpuText!: Phaser.GameObjects.Text;
   neededText!: Phaser.GameObjects.Text;
@@ -173,6 +174,10 @@ class WhotScene extends Phaser.Scene {
 
   constructor() {
     super({ key: 'WhotScene' });
+  }
+
+  preload() {
+    this.load.atlas('whot', '/whot_spritesheet.png', '/whot_atlas.json');
   }
 
   create() {
@@ -203,6 +208,9 @@ class WhotScene extends Phaser.Scene {
       this.whotShapes.push(g);
       this.whotOverlay.add(g);
     });
+
+    this.focusCursor = this.add.graphics();
+    this.focusCursor.setDepth(1000);
 
     try {
       const saved = localStorage.getItem('naija_whot_settings_hd');
@@ -257,8 +265,8 @@ class WhotScene extends Phaser.Scene {
     this.pile = [];
     this.drawCount = 0;
     this.neededSuit = null;
-    this.cardContainers.forEach(c => c.destroy());
-    this.cardContainers.clear();
+    this.cardImages.forEach(c => c.destroy());
+    this.cardImages.clear();
 
     const config = {
       circle: [1,2,3,4,5,7,8,10,11,12,13,14],
@@ -501,6 +509,24 @@ class WhotScene extends Phaser.Scene {
       if (!this.isPlayerTurn) return;
       if (action === 'LEFT') { this.selectedIndex = (this.selectedIndex - 1 + this.player.length) % this.player.length; this.arrangeCards(); }
       else if (action === 'RIGHT') { this.selectedIndex = (this.selectedIndex + 1) % this.player.length; this.arrangeCards(); }
+      else if (action === 'UP' || action === 'DOWN') {
+        const playableIndices = this.player.map((c, i) => this.canPlay(c) ? i : -1).filter(i => i !== -1);
+        if (playableIndices.length > 0) {
+          const currentPlayableIdx = playableIndices.indexOf(this.selectedIndex);
+          if (currentPlayableIdx === -1) {
+            // If not on a playable card, jump to the first one
+            this.selectedIndex = playableIndices[0];
+          } else {
+            // Navigate through playable cards only
+            if (action === 'UP') {
+              this.selectedIndex = playableIndices[(currentPlayableIdx - 1 + playableIndices.length) % playableIndices.length];
+            } else {
+              this.selectedIndex = playableIndices[(currentPlayableIdx + 1) % playableIndices.length];
+            }
+          }
+          this.arrangeCards();
+        }
+      }
       else if (action === 'OK') this.playTurn(true);
       else if (action === 'SOFT_RIGHT') {
         // Draw card
@@ -562,9 +588,9 @@ class WhotScene extends Phaser.Scene {
     if (deckLen > 0) {
       this.drawCardObj({ id: 'market', suit: 'whot', num: '', x: 20, y: 110 }, false, false, false, 10);
     } else {
-      if (this.cardContainers.has('market')) {
-        this.cardContainers.get('market')?.destroy();
-        this.cardContainers.delete('market');
+      if (this.cardImages.has('market')) {
+        this.cardImages.get('market')?.destroy();
+        this.cardImages.delete('market');
       }
     }
 
@@ -579,9 +605,9 @@ class WhotScene extends Phaser.Scene {
       card.y += 0.2 * (card.ty - card.y);
       if (i > this.pile.length - 4) this.drawCardObj(card, true, false, false, 20 + i);
       else {
-        if (this.cardContainers.has(card.id)) {
-          this.cardContainers.get(card.id)?.destroy();
-          this.cardContainers.delete(card.id);
+        if (this.cardImages.has(card.id)) {
+          this.cardImages.get(card.id)?.destroy();
+          this.cardImages.delete(card.id);
         }
       }
     });
@@ -598,7 +624,19 @@ class WhotScene extends Phaser.Scene {
       let isSel = i === this.selectedIndex && this.isPlayerTurn && this.screen === 'PLAYING';
       let isPlayable = this.screen === 'PLAYING' && this.canPlay(card);
       this.drawCardObj(card, true, isSel, isPlayable, 100 + i);
+
+      if (isSel) {
+        this.focusCursor.clear();
+        this.focusCursor.lineStyle(2, 0xf1c40f, 1);
+        const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 150);
+        this.focusCursor.alpha = 0.5 + 0.5 * pulse;
+        this.focusCursor.strokeRoundedRect(card.x - 1, card.y - 9, 48, 70, 5);
+      }
     });
+
+    if (!this.isPlayerTurn || this.screen !== 'PLAYING') {
+      this.focusCursor.clear();
+    }
 
     const neededKey = `${this.neededSuit}_${this.screen}`;
     if (this.neededText.getData('neededKey') !== neededKey) {
@@ -641,80 +679,38 @@ class WhotScene extends Phaser.Scene {
   }
 
   drawCardObj(card: any, faceUp: boolean, isSelected: boolean, isPlayable: boolean, depth: number) {
-    let c = this.cardContainers.get(card.id);
-    let needsRedraw = false;
-    if (!c) {
-      c = this.add.container(card.x, card.y);
-      let bg = this.add.graphics();
-      let textTop = this.add.text(4, 4, '', { font: 'bold 12px Arial' });
-      let textSub = this.add.text(4, 16, '', { font: 'bold 8px Arial' });
-      let centerText = this.add.text(23, 34, '', { font: 'bold 14px Arial' }).setOrigin(0.5);
-      let subCenterText = this.add.text(23, 42, '', { font: '10px Arial' }).setOrigin(0.5);
-      let shape = this.add.graphics();
-      c.add([bg, textTop, textSub, centerText, subCenterText, shape]);
-      this.cardContainers.set(card.id, c);
-      needsRedraw = true;
+    let img = this.cardImages.get(card.id);
+    let frameName = 'back';
+    if (faceUp) {
+      if (card.suit === 'whot') {
+        frameName = 'whot_20_1';
+      } else {
+        frameName = `${card.suit}_${card.num}`;
+      }
     }
     
-    c.setPosition(card.x, card.y);
-    c.setDepth(depth);
+    // selected card pops up visually
+    const displayY = isSelected ? card.y - 8 : card.y;
     
-    // Check if any visual state changed before redrawing the expensive vector graphics paths
-    if (c.getData('faceUp') !== faceUp || 
-        c.getData('isSelected') !== isSelected || 
-        c.getData('isPlayable') !== isPlayable) {
-      needsRedraw = true;
-      c.setData('faceUp', faceUp);
-      c.setData('isSelected', isSelected);
-      c.setData('isPlayable', isPlayable);
-    }
-    
-    if (!needsRedraw) {
-      return;
-    }
-    
-    let bg = c.list[0] as Phaser.GameObjects.Graphics;
-    let textTop = c.list[1] as Phaser.GameObjects.Text;
-    let textSub = c.list[2] as Phaser.GameObjects.Text;
-    let centerText = c.list[3] as Phaser.GameObjects.Text;
-    let subCenterText = c.list[4] as Phaser.GameObjects.Text;
-    let shape = c.list[5] as Phaser.GameObjects.Graphics;
-
-    bg.clear();
-    shape.clear();
-    textTop.setText('');
-    textSub.setText('');
-    centerText.setText('');
-    subCenterText.setText('');
-
-    if (isSelected) bg.lineStyle(3, 0xf1c40f);
-    else if (isPlayable) bg.lineStyle(2, 0x2ecc71);
-    else bg.lineStyle(1, 0xdddddd);
-
-    bg.fillStyle(0xfdfaf0);
-    bg.fillRoundedRect(0, 0, 46, 68, 4);
-    bg.strokeRoundedRect(0, 0, 46, 68, 4);
-
-    if (!faceUp) {
-      bg.fillStyle(0x1a8f55);
-      bg.fillRoundedRect(4, 4, 38, 60, 2);
-      bg.lineStyle(2, 0xfdfaf0);
-      bg.beginPath(); bg.moveTo(4, 4); bg.lineTo(42, 64); bg.strokePath();
-      bg.beginPath(); bg.moveTo(42, 4); bg.lineTo(4, 64); bg.strokePath();
-      centerText.setText('WHOT').setColor('#fdfaf0').setFontSize(12);
-      return;
-    }
-
-    let colorHex = card.suit === 'whot' ? '#111111' : this.getColorHex(card.suit);
-    textTop.setText(card.num.toString()).setColor(colorHex);
-    if (card.suit === 'star') textSub.setText(`(${card.num * 2})`).setColor(colorHex);
-
-    if (card.suit === 'whot') {
-      centerText.setText('WHOT').setColor(colorHex).setFontSize(14).setPosition(23, 28);
-      subCenterText.setText('20').setColor(colorHex).setPosition(23, 42);
+    if (!img) {
+      img = this.add.image(card.x, displayY, 'whot', frameName).setOrigin(0, 0);
+      this.cardImages.set(card.id, img);
     } else {
-      centerText.setPosition(23, 34);
-      this.drawShape(shape, card.suit, 23, 34, 12, COLORS[card.suit]);
+      if (img.frame.name !== frameName) {
+        img.setTexture('whot', frameName);
+      }
+      img.setPosition(card.x, displayY);
+    }
+    img.setDepth(depth);
+    
+    if (depth >= 100) {
+      if (isSelected) {
+        img.setTint(isPlayable ? 0xffffff : 0xaaaaaa);
+      } else {
+        img.setTint(isPlayable ? 0xffffff : 0x888888);
+      }
+    } else {
+      img.clearTint();
     }
   }
 
