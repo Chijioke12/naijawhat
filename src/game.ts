@@ -179,7 +179,7 @@ class WhotScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.atlas('whot', '/whot_spritesheet.png', '/whot_atlas.json');
+    this.load.atlas('whot', 'whot_spritesheet.png', 'whot_atlas.json');
   }
 
   create() {
