@@ -409,7 +409,16 @@ class WhotScene extends Phaser.Scene {
     const top = this.pile.pop();
     this.deck = [...this.pile];
     this.pile = [top];
-    this.deck.forEach(c => { c.x = 20; c.y = 110; c.tx = 20; c.ty = 110; });
+    this.deck.forEach(c => {
+      c.x = 20;
+      c.y = 110;
+      c.tx = 20;
+      c.ty = 110;
+      if (this.cardImages.has(c.id)) {
+        this.cardImages.get(c.id)?.destroy();
+        this.cardImages.delete(c.id);
+      }
+    });
     Phaser.Utils.Array.Shuffle(this.deck);
     this.showMsg('MARKET REFILLED!', '#2ecc71');
     return true;
@@ -784,7 +793,14 @@ class WhotScene extends Phaser.Scene {
         img.setRotation(0);
       }
     }
-    img.setDepth(depth);
+    let finalDepth = depth;
+    if (card.tx !== undefined && card.ty !== undefined) {
+      const isMoving = Math.abs(card.x - card.tx) > 0.5 || Math.abs(card.y - card.ty) > 0.5;
+      if (isMoving) {
+        finalDepth = 2000 + depth;
+      }
+    }
+    img.setDepth(finalDepth);
     
     // Scale logic
     let baseScale = 1.0;
