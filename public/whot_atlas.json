@@ -1163,6 +1163,48 @@
             "w": 46,
             "h": 68
           }
+        },
+        {
+          "filename": "sel_cursor",
+          "frame": {
+            "x": 230,
+            "y": 340,
+            "w": 46,
+            "h": 68
+          },
+          "rotated": false,
+          "trimmed": false,
+          "spriteSourceSize": {
+            "x": 0,
+            "y": 0,
+            "w": 46,
+            "h": 68
+          },
+          "sourceSize": {
+            "w": 46,
+            "h": 68
+          }
+        },
+        {
+          "filename": "playable_cursor",
+          "frame": {
+            "x": 276,
+            "y": 340,
+            "w": 46,
+            "h": 68
+          },
+          "rotated": false,
+          "trimmed": false,
+          "spriteSourceSize": {
+            "x": 0,
+            "y": 0,
+            "w": 46,
+            "h": 68
+          },
+          "sourceSize": {
+            "w": 46,
+            "h": 68
+          }
         }
       ]
     }

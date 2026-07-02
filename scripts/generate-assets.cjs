@@ -180,6 +180,21 @@ const generateWithCanvas = () => {
     for (const num of SUITS[suit]) drawCard(suit, num, false);
   }
 
+  const drawCursor = (name, color, thickness) => {
+    const { x, y } = addFrame(name);
+    const w = CARD_W - 2;
+    const h = CARD_H - 2;
+    ctx.save();
+    drawRoundedRect(ctx, x + 1, y + 1, w, h, 6);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawCursor('sel_cursor', '#f1c40f', 4);
+  drawCursor('playable_cursor', '#2ecc71', 3);
+
   const atlas = {
     textures: [{
       image: "whot_spritesheet.png",
@@ -190,6 +205,37 @@ const generateWithCanvas = () => {
     }]
   };
 
+  // Generate background
+  const drawBackground = () => {
+    const bgCanvas = createCanvas(240, 320);
+    const bgCtx = bgCanvas.getContext('2d');
+    
+    // Create a beautiful green radial gradient for the card table
+    const grad = bgCtx.createRadialGradient(120, 160, 20, 120, 160, 250);
+    grad.addColorStop(0, '#27ae60');
+    grad.addColorStop(1, '#145a32');
+    bgCtx.fillStyle = grad;
+    bgCtx.fillRect(0, 0, 240, 320);
+
+    // Add some subtle texture/noise
+    bgCtx.fillStyle = 'rgba(255,255,255,0.02)';
+    for(let i=0; i<5000; i++) {
+       const nx = Math.random() * 240;
+       const ny = Math.random() * 320;
+       const s = Math.random() * 2;
+       bgCtx.fillRect(nx, ny, s, s);
+    }
+    
+    // Add an inner shadow/vignette
+    bgCtx.strokeStyle = 'rgba(0,0,0,0.5)';
+    bgCtx.lineWidth = 15;
+    bgCtx.strokeRect(0, 0, 240, 320);
+
+    const bgOut = fs.createWriteStream(path.join(publicDir, 'bg.png'));
+    bgCanvas.createPNGStream().pipe(bgOut);
+  };
+  drawBackground();
+  
   const out = fs.createWriteStream(spritePath);
   canvas.createPNGStream().pipe(out);
   fs.writeFileSync(atlasPath, JSON.stringify(atlas, null, 2));
@@ -250,6 +296,16 @@ const generateWithImageMagick = () => {
   for (const suit in SUITS) {
     for (const num of SUITS[suit]) drawCard(suit, num, false);
   }
+
+  const drawCursorIM = (name, color, thickness) => {
+    const { x, y } = addFrame(name);
+    let cmd = `convert "${spritePath}" -fill none -stroke "${color}" -strokewidth ${thickness} ` +
+              `-draw "roundrectangle ${x+2},${y+2} ${x+CARD_W-2},${y+CARD_H-2} 6,6" "${spritePath}"`;
+    execSync(cmd);
+  };
+  
+  drawCursorIM('sel_cursor', '#f1c40f', 4);
+  drawCursorIM('playable_cursor', '#2ecc71', 3);
 
   const atlas = {
     textures: [{

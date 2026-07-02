@@ -107,7 +107,7 @@ export class WhotGame {
   
   constructor(parent: string | HTMLElement) {
     const config: Phaser.Types.Core.GameConfig = {
-      type: Phaser.CANVAS, // Force Canvas renderer which is hardware-accelerated/well-optimized on low-end Gecko (KaiOS)
+      type: Phaser.WEBGL, // Use WebGL renderer
       width: 240,
       height: 295,
       parent: parent,
@@ -154,7 +154,7 @@ class WhotScene extends Phaser.Scene {
   skLeft = '';
   skCenter = '';
   skRight = '';
-  playableGlows: Phaser.GameObjects.Graphics[] = [];
+  playableGlows: Phaser.GameObjects.Image[] = [];
   msg = '';
   msgColor = '#fff';
   playerScore = 0;
@@ -172,7 +172,7 @@ class WhotScene extends Phaser.Scene {
   isPlayerTurn = false;
   
   cardImages: Map<string, Phaser.GameObjects.Image> = new Map();
-  focusCursor!: Phaser.GameObjects.Graphics;
+  focusCursor!: Phaser.GameObjects.Image;
   deckText!: Phaser.GameObjects.Text;
   cpuText!: Phaser.GameObjects.Text;
   neededText!: Phaser.GameObjects.Text;
@@ -194,13 +194,14 @@ class WhotScene extends Phaser.Scene {
 
     // Use explicit relative paths for better reliability on KaiOS/OmniSD
     this.load.atlas('whot', './whot_spritesheet.png', './whot_atlas.json');
+    this.load.image('bg', './bg.png');
 
     const sounds = ['deal', 'market', 'play', 'hold', 'suspend', 'error', 'lose', 'pick2', 'pick3', 'win', 'whot', 'tick'];
     sounds.forEach(s => this.load.audio(s, `./${s}.ogg`));
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#1a5f35');
+    this.add.image(0, 0, 'bg').setOrigin(0, 0);
     this.deckText = this.add.text(43, 183, '', { font: 'bold 12px Arial', color: '#fdfaf0' }).setOrigin(0.5, 0);
     this.cpuText = this.add.text(120, 85, '', { font: 'bold 12px Arial', color: '#fff' }).setOrigin(0.5, 0);
     this.neededText = this.add.text(10, 10, '', { font: 'bold 12px Arial', color: '#fff' }).setOrigin(0, 0);
@@ -230,8 +231,9 @@ class WhotScene extends Phaser.Scene {
       this.whotOverlay.add(g);
     });
 
-    this.focusCursor = this.add.graphics();
+    this.focusCursor = this.add.image(0, 0, 'whot', 'sel_cursor');
     this.focusCursor.setDepth(1000);
+    this.focusCursor.setVisible(false);
 
     try {
       const saved = localStorage.getItem('naija_whot_settings_hd');
@@ -288,6 +290,10 @@ class WhotScene extends Phaser.Scene {
     this.neededSuit = null;
     this.cardImages.forEach(c => c.destroy());
     this.cardImages.clear();
+    if (this.playableGlows) {
+      this.playableGlows.forEach(g => g?.destroy());
+    }
+    this.playableGlows = [];
 
     const config = {
       circle: [1,2,3,4,5,7,8,10,11,12,13,14],
@@ -466,8 +472,8 @@ class WhotScene extends Phaser.Scene {
 
     hand.splice(idx, 1);
     this.pile.push(card);
-    card.tx = 97 + Math.random() * 4 - 2;
-    card.ty = 110 + Math.random() * 4 - 2;
+    card.tx = 97;
+    card.ty = 110;
     this.neededSuit = null;
 
     if (hand.length === 0) {
@@ -655,9 +661,9 @@ class WhotScene extends Phaser.Scene {
       this.drawCardObj(card, false, false, false, 50 + i);
     });
 
-    this.focusCursor.clear();
+    this.focusCursor.setVisible(false);
     if (!this.playableGlows) this.playableGlows = [];
-    this.playableGlows.forEach(g => g.clear());
+    this.playableGlows.forEach(g => g.setVisible(false));
 
     this.player.forEach((card, i) => {
       card.x += 0.2 * (card.tx - card.x);
@@ -666,31 +672,43 @@ class WhotScene extends Phaser.Scene {
       let isPlayable = this.screen === 'PLAYING' && this.canPlay(card);
       this.drawCardObj(card, true, isSel, isPlayable, 100 + i);
 
+      // We need to match the scale applied in drawCardObj
+      let baseScale = 1.0;
+      const displayY = isSel ? card.y - 8 : card.y;
+
       if (isSel) {
+        baseScale = 1.05;
+      } else if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
+        const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
+        baseScale = 1.0 + glow * 0.03;
+      }
+
+      if (isSel) {
+        this.focusCursor.setVisible(true);
+        this.focusCursor.setPosition(card.x, displayY);
+        this.focusCursor.setOrigin(0, 0);
+        this.focusCursor.setScale(baseScale);
         this.focusCursor.setDepth(100 + i + 0.5);
-        this.focusCursor.lineStyle(3, 0xf1c40f, 1);
         const pulse = 0.5 + 0.5 * Math.sin(this.time.now / 150);
-        this.focusCursor.alpha = 0.8 + 0.2 * pulse;
-        
-        // Selection border adjusted for smaller cards (46px wide)
-        // Tighter inset border to avoid covering adjacent cards
-        this.focusCursor.strokeRoundedRect(card.x + 1, card.y - 8, 44, 68, 4);
+        this.focusCursor.setAlpha(0.8 + 0.2 * pulse);
       } else if (isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
         // Individual playable indicator with depth management to prevent overlap
         if (!this.playableGlows[i]) {
-          this.playableGlows[i] = this.add.graphics();
+          this.playableGlows[i] = this.add.image(card.x, displayY, 'whot', 'playable_cursor').setOrigin(0, 0);
         }
         const g = this.playableGlows[i];
+        g.setVisible(true);
+        g.setPosition(card.x, displayY);
+        g.setOrigin(0, 0);
+        g.setScale(baseScale);
         g.setDepth(100 + i + 0.1); // Slightly above the card but below the selection
-        g.lineStyle(2, 0x2ecc71, 0.7);
-        // More inset to stay clearly within the card face
-        g.strokeRoundedRect(card.x + 4, card.y + 4, 38, 60, 4);
+        g.setAlpha(0.7);
       }
     });
 
     if (!this.isPlayerTurn || this.screen !== 'PLAYING') {
-      this.focusCursor.clear();
-      if (this.playableGlows) this.playableGlows.forEach(g => g.clear());
+      this.focusCursor.setVisible(false);
+      if (this.playableGlows) this.playableGlows.forEach(g => g.setVisible(false));
     }
 
     const neededKey = `${this.neededSuit}_${this.screen}`;
@@ -761,7 +779,10 @@ class WhotScene extends Phaser.Scene {
       if (img.frame.name !== frameName) {
         img.setTexture('whot', frameName);
       }
-      img.setPosition(card.x, displayY);
+      if (this.screen !== 'GAMEOVER') {
+        img.setPosition(card.x, displayY);
+        img.setRotation(0);
+      }
     }
     img.setDepth(depth);
     
@@ -777,12 +798,7 @@ class WhotScene extends Phaser.Scene {
           // Playable highlight: Slight green tint and subtle pulse
           const glow = 0.5 + 0.3 * Math.sin(this.time.now / 200);
           baseScale = 1.0 + glow * 0.03;
-          img.setTint(0xccffcc); // Subtle green tint for playable cards
-          
-          // Optionally add a more distinct indicator if needed, but tint + scale pulse is usually enough
-        } else if (!isPlayable && this.isPlayerTurn && this.screen === 'PLAYING') {
-          // Dim non-playable cards more clearly
-          img.setTint(0x666666);
+          img.setTint(0xffffff);
         } else {
           img.setTint(0xffffff);
         }
